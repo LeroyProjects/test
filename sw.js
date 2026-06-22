@@ -1,5 +1,5 @@
 const CACHE_NAME = 'date-app-v1';
-const ASSETS = ['/', '/jeu/', '/jeu/index.html', '/jeu/manifest.json', '/jeu/icon.svg'];
+const ASSETS = ['/test/', '/test/index.html', '/test/manifest.json', '/test/icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));

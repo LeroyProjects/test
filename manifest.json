@@ -1,7 +1,7 @@
 {
   "name": "Date du Jour",
   "short_name": "Date",
-  "start_url": "/jeu/",
+  "start_url": "/test/",
   "display": "standalone",
   "background_color": "#1a1a2e",
   "theme_color": "#e94560",
