@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#e94560">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>Date du Jour</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+    }
+    .card {
+      text-align: center;
+      background: #16213e;
+      border-radius: 20px;
+      padding: 40px 32px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+      max-width: 340px;
+      width: 90%;
+    }
+    .jour { font-size: 1.2rem; text-transform: uppercase; color: #e94560; letter-spacing: 2px; margin-bottom: 8px; }
+    .numero { font-size: 5rem; font-weight: 800; line-height: 1; }
+    .mois { font-size: 1.8rem; margin-top: 4px; color: #0f3460; background: #e94560; display: inline-block; padding: 4px 20px; border-radius: 10px; font-weight: 600; }
+    .annee { font-size: 1.2rem; margin-top: 16px; color: #888; }
+    .heure { font-size: 2.4rem; margin-top: 24px; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="jour" id="jour"></div>
+    <div class="numero" id="numero"></div>
+    <div class="mois" id="mois"></div>
+    <div class="annee" id="annee"></div>
+    <div class="heure" id="heure"></div>
+  </div>
+  <script>
+    const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+    const moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+
+    function maj() {
+      const d = new Date();
+      document.getElementById('jour').textContent = jours[d.getDay()];
+      document.getElementById('numero').textContent = d.getDate();
+      document.getElementById('mois').textContent = moisNoms[d.getMonth()];
+      document.getElementById('annee').textContent = d.getFullYear();
+      document.getElementById('heure').textContent = d.toLocaleTimeString('fr-FR');
+    }
+
+    maj();
+    setInterval(maj, 1000);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
