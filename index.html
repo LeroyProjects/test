@@ -2,63 +2,507 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#e94560">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
-  <title>Date du Jour</title>
+  <title>Paper Tail</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #1a1a2e;
       color: #eee;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      text-align: center;
+      padding: 16px 0 8px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #e94560;
+      letter-spacing: 1px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: #16213e;
+      border-bottom: 2px solid #0f3460;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .tab {
+      flex: 1;
+      padding: 12px 4px;
+      text-align: center;
+      font-size: .85rem;
+      font-weight: 600;
+      color: #888;
+      border: none;
+      background: none;
+      cursor: pointer;
+      transition: color .2s, border-bottom .2s;
+      border-bottom: 3px solid transparent;
+    }
+    .tab.active { color: #e94560; border-bottom-color: #e94560; }
+
+    .page { display: none; padding: 16px; flex: 1; overflow-y: auto; }
+    .page.active { display: block; }
+
+    /* Form */
+    .form-group { margin-bottom: 16px; }
+    .form-group > label { display: block; font-size: .85rem; color: #aaa; margin-bottom: 6px; }
+
+    .winner-toggle { display: flex; gap: 8px; }
+    .winner-btn {
+      flex: 1;
+      padding: 14px;
+      border: 2px solid #0f3460;
+      border-radius: 12px;
+      background: #16213e;
+      color: #aaa;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .winner-btn.selected {
+      border-color: #e94560;
+      color: #fff;
+      background: #e94560;
+    }
+
+    /* Checkbox grid for strategies */
+    .strat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .strat-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #16213e;
+      border: 2px solid #0f3460;
+      cursor: pointer;
+      transition: all .15s;
+      font-size: .82rem;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .strat-chip.checked {
+      border-color: #e94560;
+      background: rgba(233, 69, 96, .15);
+    }
+    .strat-chip input { display: none; }
+    .strat-chip .checkmark {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 2px solid #0f3460;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
-      min-height: 100dvh;
+      flex-shrink: 0;
+      transition: all .15s;
     }
-    .card {
-      text-align: center;
+    .strat-chip.checked .checkmark {
+      background: #e94560;
+      border-color: #e94560;
+    }
+    .strat-chip.checked .checkmark::after {
+      content: '';
+      width: 5px;
+      height: 9px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+      margin-top: -2px;
+    }
+
+    .btn-save {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #e94560;
+      color: #fff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-save:active { transform: scale(.97); }
+
+    /* History */
+    .history-title { font-size: .9rem; color: #888; margin: 20px 0 8px; }
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       background: #16213e;
-      border-radius: 20px;
-      padding: 40px 32px;
-      box-shadow: 0 8px 32px rgba(0,0,0,.4);
-      max-width: 340px;
-      width: 90%;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      font-size: .85rem;
     }
-    .jour { font-size: 1.2rem; text-transform: uppercase; color: #e94560; letter-spacing: 2px; margin-bottom: 8px; }
-    .numero { font-size: 5rem; font-weight: 800; line-height: 1; }
-    .mois { font-size: 1.8rem; margin-top: 4px; color: #0f3460; background: #e94560; display: inline-block; padding: 4px 20px; border-radius: 10px; font-weight: 600; }
-    .annee { font-size: 1.2rem; margin-top: 16px; color: #888; }
-    .heure { font-size: 2.4rem; margin-top: 24px; font-variant-numeric: tabular-nums; }
+    .history-item .info { flex: 1; }
+    .history-item .winner-name { color: #e94560; font-weight: 600; }
+    .history-item .strats { color: #888; font-size: .75rem; margin-top: 2px; }
+    .history-item .date { color: #555; font-size: .7rem; }
+    .btn-del {
+      background: none;
+      border: none;
+      color: #e94560;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      opacity: .6;
+    }
+    .btn-del:active { opacity: 1; }
+
+    /* Stats */
+    .player-section { margin-bottom: 28px; }
+    .player-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #e94560;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #0f3460;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      background: #16213e;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    .stat-box { text-align: center; flex: 1; }
+    .stat-value { font-size: 1.4rem; font-weight: 700; }
+    .stat-label { font-size: .7rem; color: #888; margin-top: 2px; }
+    .stat-value.green { color: #4ecca3; }
+    .stat-value.red { color: #e94560; }
+
+    .section-subtitle { font-size: .8rem; color: #888; margin: 14px 0 6px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .8rem;
+    }
+    th {
+      text-align: left;
+      padding: 8px 6px;
+      color: #888;
+      font-weight: 600;
+      border-bottom: 1px solid #0f3460;
+    }
+    td {
+      padding: 8px 6px;
+      border-bottom: 1px solid #0f3460;
+    }
+    tr:last-child td { border-bottom: none; }
+    .pct { color: #4ecca3; font-weight: 600; }
+
+    .empty-msg { text-align: center; color: #555; padding: 40px 0; font-size: .9rem; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="jour" id="jour"></div>
-    <div class="numero" id="numero"></div>
-    <div class="mois" id="mois"></div>
-    <div class="annee" id="annee"></div>
-    <div class="heure" id="heure"></div>
-  </div>
-  <script>
-    const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
-    const moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  <header>Paper Tail</header>
 
-    function maj() {
-      const d = new Date();
-      document.getElementById('jour').textContent = jours[d.getDay()];
-      document.getElementById('numero').textContent = d.getDate();
-      document.getElementById('mois').textContent = moisNoms[d.getMonth()];
-      document.getElementById('annee').textContent = d.getFullYear();
-      document.getElementById('heure').textContent = d.toLocaleTimeString('fr-FR');
+  <nav class="tabs">
+    <button class="tab active" data-tab="game">Partie</button>
+    <button class="tab" data-tab="players">Joueurs</button>
+    <button class="tab" data-tab="strategies">Stratégies</button>
+  </nav>
+
+  <!-- Tab 1: New game -->
+  <div class="page active" id="page-game">
+    <div class="form-group">
+      <label>Qui a gagné ?</label>
+      <div class="winner-toggle">
+        <button class="winner-btn" data-player="Romain">Romain</button>
+        <button class="winner-btn" data-player="Cassandre">Cassandre</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Stratégies de Romain</label>
+      <div class="strat-grid" id="strat-romain"></div>
+    </div>
+    <div class="form-group">
+      <label>Stratégies de Cassandre</label>
+      <div class="strat-grid" id="strat-cassandre"></div>
+    </div>
+    <button class="btn-save" id="btn-save">Enregistrer</button>
+    <div class="history-title">Dernières parties</div>
+    <div id="history"></div>
+  </div>
+
+  <!-- Tab 2: Player stats -->
+  <div class="page" id="page-players">
+    <div id="player-stats"></div>
+  </div>
+
+  <!-- Tab 3: Strategy stats -->
+  <div class="page" id="page-strategies">
+    <div id="strategy-stats"></div>
+  </div>
+
+  <script>
+    const STRATEGIES = [
+      'Steak','Bois','Relique de la guerre','Relique de la sagesse',
+      'Caillou','Marché noir','Artefact','Flexible',
+      'Bibliothèque','Crypte','Princesse','Titan','Kraken','Port'
+    ];
+    const PLAYERS = ['Romain','Cassandre'];
+    const STORAGE_KEY = 'papertail_games';
+
+    let games = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let selectedWinner = null;
+
+    // Migrate old single-strategy data to arrays
+    games = games.map(g => ({
+      ...g,
+      strategieRomain: Array.isArray(g.strategieRomain) ? g.strategieRomain : [g.strategieRomain],
+      strategieCassandre: Array.isArray(g.strategieCassandre) ? g.strategieCassandre : [g.strategieCassandre]
+    }));
+
+    function initCheckboxes() {
+      ['strat-romain', 'strat-cassandre'].forEach(id => {
+        const container = document.getElementById(id);
+        container.innerHTML = STRATEGIES.map(s => `
+          <label class="strat-chip" data-strat="${s}">
+            <input type="checkbox" value="${s}">
+            <span class="checkmark"></span>
+            ${s}
+          </label>
+        `).join('');
+        container.querySelectorAll('.strat-chip').forEach(chip => {
+          chip.addEventListener('click', e => {
+            e.preventDefault();
+            const cb = chip.querySelector('input');
+            cb.checked = !cb.checked;
+            chip.classList.toggle('checked', cb.checked);
+          });
+        });
+      });
     }
 
-    maj();
-    setInterval(maj, 1000);
+    function getSelectedStrategies(containerId) {
+      return [...document.querySelectorAll('#' + containerId + ' input:checked')].map(cb => cb.value);
+    }
+
+    function save() {
+      games.sort((a, b) => b.id - a.id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
+    }
+
+    // Winner toggle
+    document.querySelectorAll('.winner-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.winner-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedWinner = btn.dataset.player;
+      });
+    });
+
+    // Save game
+    document.getElementById('btn-save').addEventListener('click', () => {
+      const sr = getSelectedStrategies('strat-romain');
+      const sc = getSelectedStrategies('strat-cassandre');
+      if (!selectedWinner) return alert('Choisis le gagnant !');
+      if (sr.length === 0 || sc.length === 0) return alert('Choisis au moins une stratégie pour chaque joueur !');
+
+      games.push({
+        id: Date.now(),
+        date: new Date().toLocaleDateString('fr-FR'),
+        gagnant: selectedWinner,
+        strategieRomain: sr,
+        strategieCassandre: sc
+      });
+      save();
+
+      // Reset form
+      selectedWinner = null;
+      document.querySelectorAll('.winner-btn').forEach(b => b.classList.remove('selected'));
+      document.querySelectorAll('.strat-chip').forEach(chip => {
+        chip.classList.remove('checked');
+        chip.querySelector('input').checked = false;
+      });
+
+      renderHistory();
+    });
+
+    function deleteGame(id) {
+      games = games.filter(g => g.id !== id);
+      save();
+      renderHistory();
+      renderPlayerStats();
+      renderStrategyStats();
+    }
+
+    function formatStrats(arr) {
+      return arr.join(', ');
+    }
+
+    function renderHistory() {
+      const sorted = [...games].sort((a, b) => b.id - a.id);
+      const last5 = sorted.slice(0, 5);
+      const el = document.getElementById('history');
+      if (last5.length === 0) {
+        el.innerHTML = '<div class="empty-msg">Aucune partie enregistrée</div>';
+        return;
+      }
+      el.innerHTML = last5.map(g => `
+        <div class="history-item">
+          <div class="info">
+            <div><span class="winner-name">${g.gagnant}</span> a gagné</div>
+            <div class="strats">R: ${formatStrats(g.strategieRomain)} — C: ${formatStrats(g.strategieCassandre)}</div>
+            <div class="date">${g.date}</div>
+          </div>
+          <button class="btn-del" onclick="deleteGame(${g.id})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    function computePlayerStats(player, gamesList) {
+      const wins = gamesList.filter(g => g.gagnant === player).length;
+      const total = gamesList.length;
+      const losses = total - wins;
+      const pct = total > 0 ? Math.round(wins / total * 100) : 0;
+      return { wins, losses, total, pct };
+    }
+
+    function computePlayerStrategyStats(player, gamesList) {
+      const stratKey = player === 'Romain' ? 'strategieRomain' : 'strategieCassandre';
+      const stats = {};
+      gamesList.forEach(g => {
+        const strats = g[stratKey];
+        strats.forEach(s => {
+          if (!stats[s]) stats[s] = { wins: 0, losses: 0, total: 0 };
+          stats[s].total++;
+          if (g.gagnant === player) stats[s].wins++;
+          else stats[s].losses++;
+        });
+      });
+      return stats;
+    }
+
+    function renderPlayerStats() {
+      const el = document.getElementById('player-stats');
+      if (games.length === 0) {
+        el.innerHTML = '<div class="empty-msg">Aucune donnée</div>';
+        return;
+      }
+
+      const sorted = [...games].sort((a, b) => b.id - a.id);
+      const last10 = sorted.slice(0, 10);
+
+      el.innerHTML = PLAYERS.map(player => {
+        const allStats = computePlayerStats(player, games);
+        const last10Stats = computePlayerStats(player, last10);
+        const stratStats = computePlayerStrategyStats(player, games);
+
+        const stratRows = Object.entries(stratStats)
+          .sort((a, b) => b[1].total - a[1].total)
+          .map(([strat, s]) => {
+            const pct = s.total > 0 ? Math.round(s.wins / s.total * 100) : 0;
+            return `<tr><td>${strat}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.total}</td><td class="pct">${pct}%</td></tr>`;
+          }).join('');
+
+        return `
+          <div class="player-section">
+            <div class="player-name">${player}</div>
+            <div class="section-subtitle">Global (${allStats.total} parties)</div>
+            <div class="stat-row">
+              <div class="stat-box"><div class="stat-value green">${allStats.wins}</div><div class="stat-label">Victoires</div></div>
+              <div class="stat-box"><div class="stat-value red">${allStats.losses}</div><div class="stat-label">Défaites</div></div>
+              <div class="stat-box"><div class="stat-value">${allStats.pct}%</div><div class="stat-label">% Victoire</div></div>
+            </div>
+            <div class="section-subtitle">10 dernières parties</div>
+            <div class="stat-row">
+              <div class="stat-box"><div class="stat-value green">${last10Stats.wins}</div><div class="stat-label">Victoires</div></div>
+              <div class="stat-box"><div class="stat-value red">${last10Stats.losses}</div><div class="stat-label">Défaites</div></div>
+              <div class="stat-box"><div class="stat-value">${last10Stats.pct}%</div><div class="stat-label">% Victoire</div></div>
+            </div>
+            <div class="section-subtitle">Par stratégie</div>
+            <table>
+              <tr><th>Stratégie</th><th>V</th><th>D</th><th>Total</th><th>%</th></tr>
+              ${stratRows || '<tr><td colspan="5" style="text-align:center;color:#555">—</td></tr>'}
+            </table>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderStrategyStats() {
+      const el = document.getElementById('strategy-stats');
+      if (games.length === 0) {
+        el.innerHTML = '<div class="empty-msg">Aucune donnée</div>';
+        return;
+      }
+
+      const stats = {};
+      STRATEGIES.forEach(s => { stats[s] = { wins: 0, losses: 0, total: 0 }; });
+
+      games.forEach(g => {
+        g.strategieRomain.forEach(sr => {
+          stats[sr].total++;
+          if (g.gagnant === 'Romain') stats[sr].wins++;
+          else stats[sr].losses++;
+        });
+        g.strategieCassandre.forEach(sc => {
+          stats[sc].total++;
+          if (g.gagnant === 'Cassandre') stats[sc].wins++;
+          else stats[sc].losses++;
+        });
+      });
+
+      const rows = STRATEGIES
+        .filter(s => stats[s].total > 0)
+        .sort((a, b) => stats[b].total - stats[a].total)
+        .map(s => {
+          const st = stats[s];
+          const pct = st.total > 0 ? Math.round(st.wins / st.total * 100) : 0;
+          return `<tr><td>${s}</td><td>${st.wins}</td><td>${st.losses}</td><td>${st.total}</td><td class="pct">${pct}%</td></tr>`;
+        }).join('');
+
+      el.innerHTML = `
+        <table>
+          <tr><th>Stratégie</th><th>V</th><th>D</th><th>Total</th><th>%</th></tr>
+          ${rows || '<tr><td colspan="5" style="text-align:center;color:#555">—</td></tr>'}
+        </table>
+      `;
+    }
+
+    // Tab navigation
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('page-' + tab.dataset.tab).classList.add('active');
+        renderPlayerStats();
+        renderStrategyStats();
+      });
+    });
+
+    // Init
+    initCheckboxes();
+    renderHistory();
+    renderPlayerStats();
+    renderStrategyStats();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');

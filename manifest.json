@@ -1,6 +1,6 @@
 {
-  "name": "Date du Jour",
-  "short_name": "Date",
+  "name": "Paper Tail Scoring",
+  "short_name": "Paper Tail",
   "start_url": "/test/",
   "display": "standalone",
   "background_color": "#1a1a2e",
