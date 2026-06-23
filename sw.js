@@ -1,4 +1,4 @@
-const CACHE_NAME = 'papertail-v2';
+const CACHE_NAME = 'papertail-v3';
 const ASSETS = ['/test/', '/test/index.html', '/test/manifest.json', '/test/icon.svg'];
 
 self.addEventListener('install', e => {

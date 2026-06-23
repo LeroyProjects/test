@@ -29,6 +29,15 @@
       letter-spacing: 1px;
     }
 
+    .sync-status {
+      text-align: center;
+      font-size: .7rem;
+      padding: 2px 0 4px;
+    }
+    .sync-status.ok { color: #4ecca3; }
+    .sync-status.error { color: #e94560; }
+    .sync-status.loading { color: #888; }
+
     /* Tabs */
     .tabs {
       display: flex;
@@ -142,6 +151,7 @@
       margin-top: 8px;
     }
     .btn-save:active { transform: scale(.97); }
+    .btn-save:disabled { opacity: .5; }
 
     /* History */
     .history-title { font-size: .9rem; color: #888; margin: 20px 0 8px; }
@@ -220,6 +230,7 @@
 </head>
 <body>
   <header>Paper Tales</header>
+  <div class="sync-status loading" id="sync-status">Connexion...</div>
 
   <nav class="tabs">
     <button class="tab active" data-tab="game">Partie</button>
@@ -259,24 +270,46 @@
     <div id="strategy-stats"></div>
   </div>
 
-  <script>
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAnj20N2Bqj8meXGNwFCS2UEwo-mmWDpR0",
+      authDomain: "paper-tail.firebaseapp.com",
+      projectId: "paper-tail",
+      storageBucket: "paper-tail.firebasestorage.app",
+      messagingSenderId: "555567511396",
+      appId: "1:555567511396:web:50cae2d4a6f4fb685f2c71"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const gamesCol = collection(db, 'games');
+
     const STRATEGIES = [
       'Steak','Bois','Relique de la guerre','Relique de la sagesse',
       'Caillou','Marché noir','Artefact','Flexible',
       'Bibliothèque','Crypte','Princesse','Titan','Kraken','Port'
     ];
     const PLAYERS = ['Romain','Cassandre'];
-    const STORAGE_KEY = 'papertail_games';
 
-    let games = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let games = [];
     let selectedWinner = null;
+    const syncEl = document.getElementById('sync-status');
 
-    // Migrate old single-strategy data to arrays
-    games = games.map(g => ({
-      ...g,
-      strategieRomain: Array.isArray(g.strategieRomain) ? g.strategieRomain : [g.strategieRomain],
-      strategieCassandre: Array.isArray(g.strategieCassandre) ? g.strategieCassandre : [g.strategieCassandre]
-    }));
+    // Real-time listener
+    const q = query(gamesCol, orderBy('timestamp', 'desc'));
+    onSnapshot(q, snapshot => {
+      games = snapshot.docs.map(d => ({ fireId: d.id, ...d.data() }));
+      syncEl.textContent = 'Synchronisé';
+      syncEl.className = 'sync-status ok';
+      renderAll();
+    }, err => {
+      syncEl.textContent = 'Erreur de connexion';
+      syncEl.className = 'sync-status error';
+    });
 
     function initCheckboxes() {
       ['strat-romain', 'strat-cassandre'].forEach(id => {
@@ -303,11 +336,6 @@
       return [...document.querySelectorAll('#' + containerId + ' input:checked')].map(cb => cb.value);
     }
 
-    function save() {
-      games.sort((a, b) => b.id - a.id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(games));
-    }
-
     // Winner toggle
     document.querySelectorAll('.winner-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -317,48 +345,47 @@
       });
     });
 
-    // Save game
-    document.getElementById('btn-save').addEventListener('click', () => {
+    // Save game to Firestore
+    document.getElementById('btn-save').addEventListener('click', async () => {
       const sr = getSelectedStrategies('strat-romain');
       const sc = getSelectedStrategies('strat-cassandre');
       if (!selectedWinner) return alert('Choisis le gagnant !');
       if (sr.length === 0 || sc.length === 0) return alert('Choisis au moins une stratégie pour chaque joueur !');
 
-      games.push({
-        id: Date.now(),
+      const btn = document.getElementById('btn-save');
+      btn.disabled = true;
+      btn.textContent = '...';
+
+      await addDoc(gamesCol, {
+        timestamp: Date.now(),
         date: new Date().toLocaleDateString('fr-FR'),
         gagnant: selectedWinner,
         strategieRomain: sr,
         strategieCassandre: sc
       });
-      save();
 
-      // Reset form
+      btn.disabled = false;
+      btn.textContent = 'Enregistrer';
+
       selectedWinner = null;
       document.querySelectorAll('.winner-btn').forEach(b => b.classList.remove('selected'));
       document.querySelectorAll('.strat-chip').forEach(chip => {
         chip.classList.remove('checked');
         chip.querySelector('input').checked = false;
       });
-
-      renderHistory();
     });
 
-    function deleteGame(id) {
-      games = games.filter(g => g.id !== id);
-      save();
-      renderHistory();
-      renderPlayerStats();
-      renderStrategyStats();
-    }
+    // Delete game from Firestore
+    window.deleteGame = async function(fireId) {
+      await deleteDoc(doc(db, 'games', fireId));
+    };
 
     function formatStrats(arr) {
       return arr.join(', ');
     }
 
     function renderHistory() {
-      const sorted = [...games].sort((a, b) => b.id - a.id);
-      const last5 = sorted.slice(0, 5);
+      const last5 = games.slice(0, 5);
       const el = document.getElementById('history');
       if (last5.length === 0) {
         el.innerHTML = '<div class="empty-msg">Aucune partie enregistrée</div>';
@@ -371,7 +398,7 @@
             <div class="strats">R: ${formatStrats(g.strategieRomain)} — C: ${formatStrats(g.strategieCassandre)}</div>
             <div class="date">${g.date}</div>
           </div>
-          <button class="btn-del" onclick="deleteGame(${g.id})">✕</button>
+          <button class="btn-del" onclick="deleteGame('${g.fireId}')">✕</button>
         </div>
       `).join('');
     }
@@ -406,8 +433,7 @@
         return;
       }
 
-      const sorted = [...games].sort((a, b) => b.id - a.id);
-      const last10 = sorted.slice(0, 10);
+      const last10 = games.slice(0, 10);
 
       el.innerHTML = PLAYERS.map(player => {
         const allStats = computePlayerStats(player, games);
@@ -486,6 +512,12 @@
       `;
     }
 
+    function renderAll() {
+      renderHistory();
+      renderPlayerStats();
+      renderStrategyStats();
+    }
+
     // Tab navigation
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -493,16 +525,10 @@
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         document.getElementById('page-' + tab.dataset.tab).classList.add('active');
-        renderPlayerStats();
-        renderStrategyStats();
       });
     });
 
-    // Init
     initCheckboxes();
-    renderHistory();
-    renderPlayerStats();
-    renderStrategyStats();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js');
