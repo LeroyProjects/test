@@ -226,6 +226,51 @@
     .pct { color: #4ecca3; font-weight: 600; }
 
     .empty-msg { text-align: center; color: #555; padding: 40px 0; font-size: .9rem; }
+
+    /* Synergy */
+    .synergy-card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .synergy-card .combo-name { font-weight: 600; font-size: .85rem; }
+    .synergy-card .combo-detail { font-size: .75rem; color: #888; margin-top: 4px; }
+    .synergy-badge {
+      display: inline-block;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      margin-left: 6px;
+    }
+    .synergy-badge.positive { background: rgba(78,204,163,.2); color: #4ecca3; }
+    .synergy-badge.negative { background: rgba(233,69,96,.2); color: #e94560; }
+    .synergy-badge.neutral { background: rgba(136,136,136,.2); color: #888; }
+    .matchup-bar {
+      height: 8px;
+      border-radius: 4px;
+      background: #0f3460;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .matchup-bar .fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .3s;
+    }
+    .matchup-bar .fill.green { background: #4ecca3; }
+    .matchup-bar .fill.red { background: #e94560; }
+    .section-title {
+      font-size: .95rem;
+      font-weight: 700;
+      color: #e94560;
+      margin: 16px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #0f3460;
+    }
+    .section-title:first-child { margin-top: 0; }
+    .min-games-note { font-size: .7rem; color: #555; text-align: center; margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -236,6 +281,7 @@
     <button class="tab active" data-tab="game">Partie</button>
     <button class="tab" data-tab="players">Joueurs</button>
     <button class="tab" data-tab="strategies">Stratégies</button>
+    <button class="tab" data-tab="synergies">Synergies</button>
   </nav>
 
   <!-- Tab 1: New game -->
@@ -268,6 +314,11 @@
   <!-- Tab 3: Strategy stats -->
   <div class="page" id="page-strategies">
     <div id="strategy-stats"></div>
+  </div>
+
+  <!-- Tab 4: Synergies -->
+  <div class="page" id="page-synergies">
+    <div id="synergy-stats"></div>
   </div>
 
   <!-- Firebase SDK -->
@@ -514,10 +565,132 @@
       `;
     }
 
+    function computeSynergies() {
+      const combos = {};
+      games.forEach(g => {
+        ['strategieRomain', 'strategieCassandre'].forEach(key => {
+          const strats = g[key];
+          const player = key === 'strategieRomain' ? 'Romain' : 'Cassandre';
+          const won = g.gagnant === player;
+          if (strats.length < 2) return;
+          for (let i = 0; i < strats.length; i++) {
+            for (let j = i + 1; j < strats.length; j++) {
+              const pair = [strats[i], strats[j]].sort().join(' + ');
+              if (!combos[pair]) combos[pair] = { wins: 0, total: 0 };
+              combos[pair].total++;
+              if (won) combos[pair].wins++;
+            }
+          }
+        });
+      });
+      return combos;
+    }
+
+    function computeIndividualWinRates() {
+      const stats = {};
+      games.forEach(g => {
+        ['strategieRomain', 'strategieCassandre'].forEach(key => {
+          const player = key === 'strategieRomain' ? 'Romain' : 'Cassandre';
+          const won = g.gagnant === player;
+          g[key].forEach(s => {
+            if (!stats[s]) stats[s] = { wins: 0, total: 0 };
+            stats[s].total++;
+            if (won) stats[s].wins++;
+          });
+        });
+      });
+      return stats;
+    }
+
+    function computeMatchups() {
+      const matchups = {};
+      games.forEach(g => {
+        g.strategieRomain.forEach(sr => {
+          g.strategieCassandre.forEach(sc => {
+            const key = sr + ' vs ' + sc;
+            if (!matchups[key]) matchups[key] = { a: sr, b: sc, winsA: 0, winsB: 0, total: 0 };
+            matchups[key].total++;
+            if (g.gagnant === 'Romain') matchups[key].winsA++;
+            else matchups[key].winsB++;
+          });
+        });
+      });
+      return matchups;
+    }
+
+    function renderSynergyStats() {
+      const el = document.getElementById('synergy-stats');
+      if (games.length === 0) {
+        el.innerHTML = '<div class="empty-msg">Aucune donnée</div>';
+        return;
+      }
+
+      const combos = computeSynergies();
+      const indiv = computeIndividualWinRates();
+      const matchups = computeMatchups();
+
+      let html = '<div class="section-title">Synergies (combos)</div>';
+
+      const comboEntries = Object.entries(combos)
+        .filter(([, s]) => s.total >= 2)
+        .sort((a, b) => b[1].total - a[1].total);
+
+      if (comboEntries.length === 0) {
+        html += '<div class="empty-msg">Pas assez de données (min. 2 parties par combo)</div>';
+      } else {
+        comboEntries.forEach(([pair, s]) => {
+          const pct = Math.round(s.wins / s.total * 100);
+          const parts = pair.split(' + ');
+          const avgIndiv = parts.reduce((sum, p) => {
+            const ind = indiv[p];
+            return sum + (ind && ind.total > 0 ? ind.wins / ind.total * 100 : 50);
+          }, 0) / parts.length;
+          const diff = pct - Math.round(avgIndiv);
+          let badge, badgeClass;
+          if (diff > 5) { badge = '+' + diff + '%'; badgeClass = 'positive'; }
+          else if (diff < -5) { badge = diff + '%'; badgeClass = 'negative'; }
+          else { badge = '=' + diff + '%'; badgeClass = 'neutral'; }
+
+          html += `
+            <div class="synergy-card">
+              <div class="combo-name">${pair} <span class="synergy-badge ${badgeClass}">${badge}</span></div>
+              <div class="combo-detail">${s.wins}V / ${s.total - s.wins}D — ${pct}% victoire (moy. individuelle: ${Math.round(avgIndiv)}%)</div>
+              <div class="matchup-bar"><div class="fill green" style="width:${pct}%"></div></div>
+            </div>`;
+        });
+      }
+
+      html += '<div class="section-title">Matchups (face à face)</div>';
+
+      const matchupEntries = Object.values(matchups)
+        .filter(m => m.total >= 2)
+        .sort((a, b) => b.total - a.total);
+
+      if (matchupEntries.length === 0) {
+        html += '<div class="empty-msg">Pas assez de données (min. 2 confrontations)</div>';
+      } else {
+        matchupEntries.forEach(m => {
+          const pctA = Math.round(m.winsA / m.total * 100);
+          const pctB = 100 - pctA;
+          const barClass = pctA >= 50 ? 'green' : 'red';
+          html += `
+            <div class="synergy-card">
+              <div class="combo-name">${m.a} vs ${m.b}</div>
+              <div class="combo-detail">${m.a}: ${m.winsA}V (${pctA}%) — ${m.b}: ${m.winsB}V (${pctB}%) — ${m.total} confrontations</div>
+              <div class="matchup-bar"><div class="fill ${barClass}" style="width:${pctA}%"></div></div>
+            </div>`;
+        });
+      }
+
+      html += '<div class="min-games-note">Min. 2 parties pour apparaître</div>';
+      el.innerHTML = html;
+    }
+
     function renderAll() {
       renderHistory();
       renderPlayerStats();
       renderStrategyStats();
+      renderSynergyStats();
     }
 
     // Tab navigation
