@@ -223,7 +223,10 @@
       border-bottom: 1px solid #0f3460;
     }
     tr:last-child td { border-bottom: none; }
-    .pct { color: #4ecca3; font-weight: 600; }
+    .pct { font-weight: 600; }
+    .pct.high { color: #4ecca3; }
+    .pct.mid { color: #f0a500; }
+    .pct.low { color: #e94560; }
 
     .empty-msg { text-align: center; color: #555; padding: 40px 0; font-size: .9rem; }
 
@@ -433,6 +436,12 @@
       await deleteDoc(doc(db, 'games', fireId));
     };
 
+    function pctClass(pct) {
+      if (pct >= 55) return 'high';
+      if (pct >= 40) return 'mid';
+      return 'low';
+    }
+
     function formatStrats(arr) {
       return arr.join(', ');
     }
@@ -494,10 +503,14 @@
         const stratStats = computePlayerStrategyStats(player, games);
 
         const stratRows = Object.entries(stratStats)
-          .sort((a, b) => b[1].total - a[1].total)
+          .sort((a, b) => {
+            const pctA = a[1].total > 0 ? a[1].wins / a[1].total : 0;
+            const pctB = b[1].total > 0 ? b[1].wins / b[1].total : 0;
+            return pctB - pctA || b[1].total - a[1].total;
+          })
           .map(([strat, s]) => {
             const pct = s.total > 0 ? Math.round(s.wins / s.total * 100) : 0;
-            return `<tr><td>${strat}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.total}</td><td class="pct">${pct}%</td></tr>`;
+            return `<tr><td>${strat}</td><td>${s.wins}</td><td>${s.losses}</td><td>${s.total}</td><td class="pct ${pctClass(pct)}">${pct}%</td></tr>`;
           }).join('');
 
         return `
@@ -550,11 +563,15 @@
 
       const rows = STRATEGIES
         .filter(s => stats[s].total > 0)
-        .sort((a, b) => stats[b].total - stats[a].total)
+        .sort((a, b) => {
+          const pctA = stats[a].total > 0 ? stats[a].wins / stats[a].total : 0;
+          const pctB = stats[b].total > 0 ? stats[b].wins / stats[b].total : 0;
+          return pctB - pctA || stats[b].total - stats[a].total;
+        })
         .map(s => {
           const st = stats[s];
           const pct = st.total > 0 ? Math.round(st.wins / st.total * 100) : 0;
-          return `<tr><td>${s}</td><td>${st.wins}</td><td>${st.losses}</td><td>${st.total}</td><td class="pct">${pct}%</td></tr>`;
+          return `<tr><td>${s}</td><td>${st.wins}</td><td>${st.losses}</td><td>${st.total}</td><td class="pct ${pctClass(pct)}">${pct}%</td></tr>`;
         }).join('');
 
       el.innerHTML = `
@@ -633,7 +650,11 @@
 
       const comboEntries = Object.entries(combos)
         .filter(([, s]) => s.total >= 2)
-        .sort((a, b) => b[1].total - a[1].total);
+        .sort((a, b) => {
+          const pctA = a[1].wins / a[1].total;
+          const pctB = b[1].wins / b[1].total;
+          return pctB - pctA || b[1].total - a[1].total;
+        });
 
       if (comboEntries.length === 0) {
         html += '<div class="empty-msg">Pas assez de données (min. 2 parties par combo)</div>';
@@ -664,7 +685,11 @@
 
       const matchupEntries = Object.values(matchups)
         .filter(m => m.total >= 2)
-        .sort((a, b) => b.total - a.total);
+        .sort((a, b) => {
+          const diffA = Math.abs(a.winsA / a.total - 0.5);
+          const diffB = Math.abs(b.winsA / b.total - 0.5);
+          return diffB - diffA || b.total - a.total;
+        });
 
       if (matchupEntries.length === 0) {
         html += '<div class="empty-msg">Pas assez de données (min. 2 confrontations)</div>';
